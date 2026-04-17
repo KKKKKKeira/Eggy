@@ -511,7 +511,74 @@ const DEFAULT_STYLE = STYLE_PRESETS[0].style;
 // ===== UTILITY =====
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
-const APP_VERSION = 'v1.3.0';
+const APP_VERSION = 'v1.4.0';
+
+// ===== HISTORY (IndexedDB) =====
+const HIST_DB = 'eggy_history';
+const HIST_STORE = 'sessions';
+const KEEP_DAYS = 10;
+
+function openHistDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(HIST_DB, 1);
+    req.onupgradeneeded = e => {
+      if (!e.target.result.objectStoreNames.contains(HIST_STORE))
+        e.target.result.createObjectStore(HIST_STORE, { keyPath: 'id' });
+    };
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+async function histSave(session) {
+  try {
+    const db = await openHistDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(HIST_STORE, 'readwrite');
+      tx.objectStore(HIST_STORE).put(session);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  } catch(e) { console.warn('History save failed', e); }
+}
+async function histLoadAll() {
+  try {
+    const db = await openHistDB();
+    return await new Promise((res, rej) => {
+      const tx = db.transaction(HIST_STORE, 'readonly');
+      const req = tx.objectStore(HIST_STORE).getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror = () => rej(req.error);
+    });
+  } catch(e) { return []; }
+}
+async function histDelete(id) {
+  try {
+    const db = await openHistDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(HIST_STORE, 'readwrite');
+      tx.objectStore(HIST_STORE).delete(id);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  } catch(e) { console.warn('History delete failed', e); }
+}
+async function histCleanup() {
+  const cutoff = Date.now() - KEEP_DAYS * 86400000;
+  const all = await histLoadAll();
+  for (const s of all) if (s.timestamp < cutoff) await histDelete(s.id);
+}
+async function histDownloadZip(session) {
+  const zip = new JSZip();
+  session.images.forEach((img, i) => {
+    zip.file(`${String(i+1).padStart(2,'0')}_${img.sceneName || 'scene'}.png`, img.base64Data, { base64: true });
+  });
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = new Date(session.timestamp);
+  const label = `${d.getMonth()+1}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+  a.download = `EGGY_${label}.zip`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // ===== NEWSLETTER FORM =====
 // ── 設定方式（只需要做一次）────────────────────────────────────
@@ -1587,6 +1654,69 @@ function OutputCard({ result, onRegenerate, onRevisionRegenerate, onSelectVersio
   );
 }
 
+// ===== HISTORY SECTION =====
+function HistorySection({ sessions, onDelete }) {
+  const [open, setOpen] = useState(true);
+  const [downloading, setDownloading] = useState(null);
+  if (sessions.length === 0) return null;
+
+  const fmt = ts => {
+    const d = new Date(ts);
+    return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+  const daysLeft = ts => Math.max(0, Math.ceil((ts + KEEP_DAYS * 86400000 - Date.now()) / 86400000));
+
+  const handleDownload = async (s) => {
+    setDownloading(s.id);
+    await histDownloadZip(s);
+    setDownloading(null);
+  };
+
+  return (
+    <div className="section">
+      <div className="section-header" onClick={() => setOpen(!open)}>
+        <h2>&#x1F5C2; 生成記錄（保留 {KEEP_DAYS} 天）</h2>
+        <span className={`collapse-icon ${open ? 'open' : ''}`}>&#x25BC;</span>
+      </div>
+      {open && (
+        <div style={{marginTop:16}}>
+          <div className="field-hint" style={{marginBottom:14}}>共 {sessions.length} 筆，儲存於此瀏覽器，到期自動清除。</div>
+          {[...sessions].sort((a,b) => b.timestamp - a.timestamp).map(s => (
+            <div key={s.id} style={{background:'#F7F2EE',border:'1.5px solid #EDE0D6',borderRadius:10,padding:'14px 16px',marginBottom:12}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontWeight:700,fontSize:'0.9rem',color:'#1C1410'}}>{fmt(s.timestamp)}</span>
+                  <span style={{fontSize:'0.75rem',color:'#9A7F76'}}>· {s.images.length} 張 · 剩 {daysLeft(s.timestamp)} 天</span>
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <button className="btn btn-secondary btn-small"
+                    onClick={() => handleDownload(s)} disabled={downloading === s.id}>
+                    {downloading === s.id ? '壓縮中...' : '&#x1F4E6; 下載 ZIP'}
+                  </button>
+                  <button className="btn btn-danger btn-small" onClick={() => onDelete(s.id)}>刪除</button>
+                </div>
+              </div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {s.images.map((img, i) => (
+                  <div key={i} style={{position:'relative',flexShrink:0}}>
+                    <img src={`data:image/png;base64,${img.base64Data}`}
+                      style={{width:96,height:68,objectFit:'cover',borderRadius:6,border:'1px solid #EDE0D6',display:'block'}} />
+                    <div style={{position:'absolute',bottom:0,left:0,right:0,background:'rgba(28,20,16,0.6)',
+                      color:'#fff',fontSize:'0.58rem',padding:'2px 4px',borderRadius:'0 0 5px 5px',
+                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {String(i+1).padStart(2,'0')} {img.sceneName || ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===== MAIN APP =====
 function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
@@ -1615,7 +1745,12 @@ function App() {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [errors, setErrors] = useState([]);
   const [inpaintSceneIdx, setInpaintSceneIdx] = useState(null);
+  const [history, setHistory] = useState([]);
   const abortRef = useRef(false);
+
+  useEffect(() => {
+    histCleanup().then(() => histLoadAll().then(setHistory));
+  }, []);
 
   // Build all prompts for preview
   const getProductPhotos = () => product.photos.map(p => ({ base64: p.base64, mime: p.mime }));
@@ -1704,6 +1839,19 @@ function App() {
       }
       // Wait 3s between calls
       if (i < scenes.length - 1 && !abortRef.current) await new Promise(r => setTimeout(r, 3000));
+    }
+    // Auto-save to history
+    const saved = newResults.filter(r => r.versions.length > 0);
+    if (saved.length > 0) {
+      const session = {
+        id: uid(), timestamp: Date.now(),
+        images: saved.map(r => {
+          const ver = r.versions[r.versions.length - 1];
+          return { sceneIndex: r.sceneIndex, sceneName: r.sceneName, base64Data: ver.base64Data };
+        })
+      };
+      await histSave(session);
+      setHistory(prev => [...prev, session]);
     }
     setGenerating(false);
   };
@@ -1950,6 +2098,11 @@ function App() {
           <img src={lightboxSrc} alt="preview" />
         </div>
       )}
+
+      <HistorySection
+        sessions={history}
+        onDelete={async (id) => { await histDelete(id); setHistory(prev => prev.filter(s => s.id !== id)); }}
+      />
 
     </div>
 
