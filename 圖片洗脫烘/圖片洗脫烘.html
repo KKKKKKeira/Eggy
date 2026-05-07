@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>圖片洗脫烘</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+/* ── THEME: Warm Editorial（沿用 Eggy 配色） ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #F4EDE4; color: #1C1410; line-height: 1.6;
+}
+.app-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 2rem; font-weight: 800; }
+h2 { font-family: 'Playfair Display', Georgia, serif; font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; }
+.subtitle { color: #7A5C50; font-size: 0.9rem; margin-top: 4px; margin-bottom: 16px; }
+
+.section {
+  background: #FBF8F5; border-radius: 12px; padding: 24px;
+  margin-bottom: 20px; box-shadow: 0 1px 6px rgba(28,20,16,0.06);
+  border: 1px solid #EDE0D6;
+}
+
+label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: #3D2B23; }
+input[type="text"], input[type="password"], textarea, select {
+  width: 100%; padding: 10px 12px; border: 1.5px solid #E5D5C8; border-radius: 8px;
+  font-size: 0.95rem; font-family: inherit; background: #FBF8F5; color: #1C1410;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none; border-color: #487BE0;
+  box-shadow: 0 0 0 3px rgba(72,123,224,0.1);
+}
+textarea { resize: vertical; }
+.field-hint { font-size: 0.78rem; color: #9A7F76; margin-top: 4px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px;
+  border: 1.5px solid transparent; border-radius: 8px; font-size: 0.95rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.btn-primary { background: #487BE0; color: #fff; border-color: #487BE0; }
+.btn-primary:hover { background: #2F5FBE; border-color: #2F5FBE; }
+.btn-primary:disabled { background: #A8B8E8; border-color: #A8B8E8; cursor: not-allowed; }
+.btn-secondary { background: #FBF8F5; color: #1C1410; border-color: #D5C5BC; }
+.btn-secondary:hover { background: #F4EDE4; border-color: #487BE0; color: #487BE0; }
+.btn-danger { background: #EEF2FB; color: #487BE0; border-color: #C5D2EE; }
+.btn-danger:hover { background: #DDE6F7; }
+.btn-small { padding: 6px 12px; font-size: 0.82rem; }
+.btn-large { padding: 14px 32px; font-size: 1.05rem; letter-spacing: 0.02em; }
+
+/* API Key */
+.api-key-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.api-key-input-wrap { position: relative; flex: 1; min-width: 250px; }
+.api-key-input-wrap input { padding-right: 40px; }
+.eye-toggle {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; font-size: 1.1rem; color: #9A7F76;
+}
+.status-saved { color: #2D6A35; font-size: 0.85rem; font-weight: 600; }
+.api-hint { font-size: 0.8rem; color: #9A7F76; margin-top: 8px; }
+.api-hint a { color: #487BE0; text-decoration: none; }
+
+/* Tabs */
+.tabs { display: flex; gap: 8px; border-bottom: 2px solid #EDE0D6; margin-bottom: 20px; }
+.tab {
+  padding: 12px 20px; cursor: pointer; font-weight: 600; color: #7A5C50;
+  border-bottom: 3px solid transparent; margin-bottom: -2px; font-size: 0.95rem;
+}
+.tab.active { color: #487BE0; border-bottom-color: #487BE0; }
+.tab:hover { color: #487BE0; }
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed #D5C5BC; border-radius: 12px; padding: 32px;
+  text-align: center; cursor: pointer; transition: all 0.2s; background: #FBF8F5;
+}
+.drop-zone:hover, .drop-zone.dragging {
+  border-color: #487BE0; background: #EEF2FB;
+}
+.drop-zone p { color: #7A5C50; }
+.drop-zone strong { color: #487BE0; }
+
+/* Image grid */
+.img-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px; margin-top: 16px;
+}
+.img-card {
+  background: #FBF8F5; border: 2px solid #EDE0D6; border-radius: 10px;
+  overflow: hidden; position: relative; transition: all 0.2s;
+}
+.img-card.reference { border-color: #487BE0; box-shadow: 0 0 0 3px rgba(72,123,224,0.15); }
+.img-card img { width: 100%; height: 160px; object-fit: cover; display: block; background: #F4EDE4; }
+.img-card-body { padding: 8px 10px; }
+.img-card-name { font-size: 0.78rem; color: #3D2B23; word-break: break-all; margin-bottom: 6px; line-height: 1.3; }
+.img-card-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.img-card-actions .btn-small { flex: 1; }
+.ref-badge {
+  position: absolute; top: 8px; left: 8px; background: #487BE0; color: #fff;
+  padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.status-pill {
+  position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 700; backdrop-filter: blur(4px);
+}
+.status-pill.pending { background: rgba(154,127,118,0.85); color: #fff; }
+.status-pill.processing { background: rgba(184,92,0,0.9); color: #fff; }
+.status-pill.done { background: rgba(45,106,53,0.9); color: #fff; }
+.status-pill.error { background: rgba(72,123,224,0.9); color: #fff; }
+
+/* Result comparison */
+.compare-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-bottom: 16px; padding: 12px; background: #F4EDE4; border-radius: 10px;
+}
+.compare-col { text-align: center; }
+.compare-col img { width: 100%; max-height: 280px; object-fit: contain; border-radius: 8px; background: #fff; }
+.compare-label { font-size: 0.8rem; color: #7A5C50; font-weight: 600; margin-bottom: 6px; }
+
+/* Prompt result */
+.prompt-card {
+  background: #FBF8F5; border: 1px solid #EDE0D6; border-radius: 10px;
+  padding: 16px; margin-bottom: 14px;
+}
+.prompt-card-header { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.prompt-card-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.prompt-card-name { font-size: 0.85rem; font-weight: 600; color: #3D2B23; word-break: break-all; }
+.prompt-text {
+  background: #fff; border: 1px solid #EDE0D6; border-radius: 6px;
+  padding: 10px 12px; font-size: 0.88rem; line-height: 1.6; color: #1C1410;
+  white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow-y: auto;
+}
+.prompt-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* Misc */
+.bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+.spacer { flex: 1; }
+.spinner {
+  width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #1C1410; color: #fff; padding: 10px 18px; border-radius: 8px;
+  font-size: 0.88rem; z-index: 1000; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const TEXT_MODEL = 'gemini-2.5-flash';
+
+// ===== Helpers =====
+function readFileAsDataURL(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function dataURLtoBase64(dataURL) {
+  return dataURL.split(',')[1];
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+// ===== Gemini API =====
+async function callGeminiText(apiKey, parts) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent`;
+  const body = {
+    contents: [{ parts }],
+    generationConfig: { maxOutputTokens: 16384, temperature: 0.4 }
+  };
+  const delays = [2000, 5000, 10000, 15000];
+  let lastError;
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, delays[attempt - 1]));
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body)
+      });
+      if (resp.status === 429) throw new Error('額度已用完或請求過於頻繁');
+      if (resp.status === 401 || resp.status === 403) throw new Error('API Key 無效或沒有權限');
+      if (resp.status >= 500) { lastError = new Error(`伺服器錯誤 ${resp.status}`); continue; }
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => '');
+        throw new Error(`API ${resp.status}: ${t.slice(0, 200)}`);
+      }
+      const data = await resp.json();
+      const cand = data.candidates && data.candidates[0];
+      if (!cand) throw new Error('沒有回傳結果');
+      const textPart = cand.content.parts.find(p => p.text);
+      if (!textPart) throw new Error('回傳沒有文字');
+      return textPart.text.trim();
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.includes('API Key') || msg.includes('額度') || msg.startsWith('API ') || msg.includes('沒有')) throw err;
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('多次重試後仍失敗');
+}
+
+// ===== API Key Section =====
+function ApiKeySection({ apiKey, setApiKey }) {
+  const [show, setShow] = useState(false);
+  const [editing, setEditing] = useState(!apiKey);
+  const inputRef = useRef(null);
+
+  const save = () => {
+    const v = inputRef.current.value.trim();
+    if (!v) return;
+    localStorage.setItem('gemini_api_key', v);
+    setApiKey(v);
+    setEditing(false);
+  };
+  const clear = () => {
+    localStorage.removeItem('gemini_api_key');
+    setApiKey('');
+    setEditing(true);
+  };
+
+  return (
+    <div className="section">
+      <h2>Gemini API Key</h2>
+      {editing ? (
+        <div className="api-key-bar">
+          <div className="api-key-input-wrap">
+            <input
+              ref={inputRef}
+              type={show ? 'text' : 'password'}
+              placeholder="貼上你的 Gemini API Key"
+              defaultValue={apiKey}
+              onKeyDown={e => e.key === 'Enter' && save()}
+            />
+            <button className="eye-toggle" onClick={() => setShow(!show)}>{show ? '🙈' : '👁'}</button>
+          </div>
+          <button className="btn btn-primary btn-small" onClick={save}>儲存</button>
+        </div>
+      ) : (
+        <div className="api-key-bar">
+          <span className="status-saved">✓ 已儲存（瀏覽器本機）</span>
+          <button className="btn btn-secondary btn-small" onClick={() => setEditing(true)}>更換</button>
+          <button className="btn btn-danger btn-small" onClick={clear}>清除</button>
+        </div>
+      )}
+      <div className="api-hint">
+        在 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> 申請；只儲存在你的瀏覽器中，不會上傳。
+      </div>
+    </div>
+  );
+}
+
+// ===== Drop Zone =====
+function DropZone({ onFiles, multiple = true, hint = '點擊或拖曳照片到這裡（可一次多張）' }) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleFiles = (fileList) => {
+    const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (files.length) onFiles(files);
+  };
+
+  return (
+    <>
+      <div
+        className={`drop-zone ${dragging ? 'dragging' : ''}`}
+        onClick={() => inputRef.current.click()}
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files); }}
+      >
+        <p><strong>＋</strong> {hint}</p>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple={multiple}
+        style={{ display: 'none' }}
+        onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
+      />
+    </>
+  );
+}
+
+// ===== Prompt Generator =====
+function PromptGeneratorTab({ apiKey, showToast }) {
+  const [photos, setPhotos] = useState([]); // { id, name, mime, dataURL, base64, status, prompt?, error? }
+  const [running, setRunning] = useState(false);
+  const [language, setLanguage] = useState('en');
+  const [detailLevel, setDetailLevel] = useState('exhaustive');
+  const [extraGuidance, setExtraGuidance] = useState('');
+
+  const addFiles = async (files) => {
+    const items = await Promise.all(files.map(async f => {
+      const dataURL = await readFileAsDataURL(f);
+      return {
+        id: uid(), name: f.name, mime: f.type || 'image/png',
+        dataURL, base64: dataURLtoBase64(dataURL), status: 'pending'
+      };
+    }));
+    setPhotos(prev => [...prev, ...items]);
+  };
+
+  const removePhoto = (id) => setPhotos(prev => prev.filter(p => p.id !== id));
+  const updatePhoto = (id, patch) => setPhotos(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+
+  const detailHint = {
+    standard: '單段約 150–250 字，覆蓋主要描述',
+    detailed: '單段約 400–700 字，每個維度都展開',
+    exhaustive: '不設字數上限，逐區結構化描述每一個可見細節，目標是讓他人僅憑 prompt 就能重現幾乎一模一樣的圖'
+  }[detailLevel];
+
+  const langHint = language === 'en' ? '使用「英文」輸出（AI 圖像生成器多以英文為主）' : '使用「繁體中文」輸出';
+
+  const buildInstruction = () => {
+    const isExhaustive = detailLevel === 'exhaustive';
+    const formatRule = isExhaustive
+      ? `輸出格式：用結構化段落，**每個小節是一段密集的描述文字**，小節之間用空行分隔。每個維度都要寫到極致詳盡。整段 prompt 的目標是「他人只看這段文字就能畫出視覺幾乎一樣的圖」。**不要省略任何可見的細節**。可以使用 prompt engineering 常見的逗號分隔關鍵詞語法，但每個小節整體仍是描述性文字。`
+      : `輸出**單一段落**純文字 prompt，${detailHint}，使用 AI 圖像生成器常見的逗號分隔關鍵詞風格混合自然語句。`;
+
+    const sectionsBlock = isExhaustive ? `
+
+請依以下小節順序輸出（**每個小節都不可省略**，沒看到的內容才能略過該節，但其餘所有可見資訊都必須詳盡描述）：
+
+[STYLE & MEDIUM]
+媒材（attributed 攝影 / 3D 渲染 / 2D 插畫 / 油畫 / 水彩 / 像素 …）、繪畫感受（寫實 / 卡通 / 半寫實 / 風格化程度）、線條與表面處理、整體 finish 質感、shading 方式、render 等級。**不要寫公司名／工作室名／作品名／畫家名**，改用通用描述。
+
+[SUBJECT — 主體精細描述]
+逐一列出畫面中每個主要主體（人 / 動物 / 角色 / 物件）：
+- 物種 / 角色類型 / 性別感 / 年齡感 / 體型 / 比例
+- 五官：頭型、眼睛形狀大小色號、眉毛、鼻、嘴、耳、皮膚 / 毛 / 鱗的紋理與顏色（hex 或具體色相）
+- 髮型 / 毛流：長度、層次、分線、顏色（含 highlight / lowlight）、質感
+- 表情與情緒、視線方向、嘴部動作
+- 姿勢、肢體角度、手指動作、重心
+- 服裝（每件分開寫）：剪裁、領型、材質感、紋理、顏色（具體）、皺褶、合身度、長度、配件位置與細節
+- 飾品 / 配件 / 道具：每一個物件的形狀、材質、顏色、磨損、位置
+- 任何標誌性／容易被畫錯的特徵（疤痕、刺青、痣、特殊耳朵形狀、配色分區）
+
+[COMPOSITION & FRAMING]
+鏡頭視角（high angle / eye-level / low angle / overhead / Dutch tilt）、焦距感（廣角 / 標準 / 中長焦 / 望遠的視覺特徵）、景別（特寫 / 半身 / 全身 / 大遠景）、景深（淺景深散景強度 / 全景深）、構圖法（黃金比例 / 三分法 / 對稱 / 對角線 / 中央 / 框中框）、主體在畫面中的位置（左中右、上中下、與邊界距離）、長寬比、畫面留白方向、是否有 leading lines。
+
+[POSE & ACTION]
+完整描述當下這一幀的動作與動勢：靜止 / 走動 / 揮手 / 坐 / 蹲 …，重心、肌肉張力、衣擺飄動方向，與其他主體的相對距離與互動。
+
+[LIGHTING — 光線詳盡]
+- 光源類型（自然 / 人造 / 混合）、時間（黎明 / 早晨 / 中午 / 黃昏 / 夜間）、天氣（晴 / 陰 / 多雲 / 雨後）
+- key light：方向（前 / 側 / 背 / 頂 / 底）、硬度（hard / soft）、顏色（hex 或具體色溫 K）、強度
+- fill light：方向、顏色、強度比
+- rim / back light：是否存在、顏色、強度
+- ambient / bounce light 顏色
+- 陰影：方向、長度、邊緣硬度、顏色、深度、是否有 occlusion
+- 高光特性：specular highlight 顏色與位置、是否有 bloom、是否有耀斑（lens flare）
+- 整體光比與情緒
+
+[COLOR PALETTE & GRADING]
+- 主色調 / 副色調 / 點綴色（每個用具體色相詞或 hex）
+- 整體調性（teal-orange / sepia / pastel / muted earthy / vibrant pop / monochromatic …）
+- 對比、飽和度、白平衡傾向
+- 任何顯著的色彩交響（複互補 / 三角配色等）
+
+[BACKGROUND & ENVIRONMENT]
+場景類別（室內 / 室外 / 想像場景）、地點氛圍（用通用描述，不可寫真實地名 / 商標 / 知名地標名）、空間結構、距離層次（前景 / 中景 / 後景每層有什麼）、地板 / 牆面 / 天花板的材質與顏色、窗 / 門 / 家具 / 植物 / 道具的形狀位置顏色、天氣 / 天空狀況、空氣感（霧 / 塵 / 煙 / 體積光）。
+
+[TEXTURE & MATERIAL DETAIL]
+畫面中各表面材質的細節：皮膚毛孔感 / 布料織紋 / 金屬反射 / 玻璃透光 / 木紋 / 石材 / 塑膠光澤 / 毛髮反光 / 皮革皺褶 …。
+
+[ATMOSPHERE & MOOD]
+情緒詞、敘事感、戲劇性、節奏感、寧靜 / 緊張 / 神秘 / 溫暖 / 孤寂 …。
+
+[POST-PROCESSING & QUALITY HINTS]
+解析度感（high resolution / ultra detailed / 8K render feel）、銳利度、顆粒感（film grain）、色彩深度、是否有 chromatic aberration / vignette / motion blur / depth of field bokeh shape，整體完成度／品質詞。
+
+[NEGATIVE / AVOID]（最後一行，可選）
+列出常見會跑掉但本圖不該出現的元素，例如：no extra fingers, no warped face, no text artifacts, no logo, no watermark。`
+      : '';
+
+    return `你是頂級的 image-to-prompt 工程師。看圖後輸出能讓另一個 AI 圖像生成器**重現幾乎完全一樣的圖**的 prompt。
+
+**【避免侵權 — 嚴格規則，必遵守】**
+1. 絕對不可以提及任何專有名詞，包括但不限於：
+   - 真實人名、藝人、政治人物、歷史人物
+   - 卡通／動漫／電影／遊戲／IP 角色名（皮卡丘、米奇、瑪利歐、哈利波特、Elsa、Pikachu 等）
+   - 任何品牌、商標、商品名稱（Nike、Coca-Cola、iPhone、Apple、Samsung、星巴克 …）
+   - 任何畫家／攝影師／導演／工作室／製片公司名字（不要寫 "in the style of XXX"、不要寫 Pixar / Ghibli / Disney / Marvel / Sony / Kodak / Leica / Sony A7 等）
+   - 城市名、知名地標名稱、國家名（巴黎鐵塔 → "Parisian-style wrought-iron observation tower"；東京塔 → "red-and-white tall observation tower"；自由女神 → "classical-style copper female statue holding torch"）
+   - 任何商業字體名、軟體名、相機 / 鏡頭 / 底片型號（不要寫 Kodak Portra、Sony A7、Canon 50mm、Photoshop；改寫 "warm portrait film stock feel"、"full-frame mirrorless 50mm prime feel"）
+   - 真實品牌的 logo / wordmark / mascot 形狀
+
+2. 用通用、描述性詞彙替代：
+   - 不寫「迪士尼風格」→ 寫「圓潤可愛的 3D 卡通風格、大眼睛、柔和飽和色、Pixar-like 但不要寫 Pixar」(就只寫 "rounded cartoon 3D character style with large expressive eyes, soft saturated colors, smooth subsurface skin shading")
+   - 不寫「吉卜力」→ 寫「手繪日式動畫感、柔和水彩光線、細膩自然背景、温暖懷舊調性」
+   - 不寫品牌手機 → 寫「modern flat-edge smartphone with single front camera, dark slate aluminum frame, glossy display」
+   - 不寫品牌咖啡店 → 寫「contemporary minimalist coffee shop with light oak counter and warm pendant lighting」
+
+3. 描述具體性勝於模糊形容詞。能用具體色相、材質、形狀、比例的就用具體值；可以使用 hex 色碼。
+
+**【詳盡度要求】**
+${detailHint}。${formatRule}
+${sectionsBlock}
+
+**【語言】**
+${langHint}。
+
+**【輸出規則】**
+- 不要前言、不要結論、不要 markdown 包裝、不要編號、不要引號、不要在開頭寫 "Prompt:" 之類的標籤
+- 直接輸出 prompt 本身${isExhaustive ? '（含小節標題用方括號 [SECTION]，每節下方是描述文字）' : '（單一段落）'}
+- 寧可長不可短：最高指導原則是「視覺重現度」
+
+${extraGuidance.trim() ? '【使用者額外要求】\n' + extraGuidance.trim() : ''}`;
+  };
+
+  const runOne = async (id) => {
+    if (!apiKey) return showToast('請先設定 API Key');
+    const p = photos.find(x => x.id === id);
+    if (!p) return;
+    updatePhoto(id, { status: 'processing', error: null });
+    try {
+      const parts = [
+        { inlineData: { mimeType: p.mime, data: p.base64 } },
+        { text: buildInstruction() }
+      ];
+      const text = await callGeminiText(apiKey, parts);
+      updatePhoto(id, { status: 'done', prompt: text });
+    } catch (err) {
+      updatePhoto(id, { status: 'error', error: err.message || '未知錯誤' });
+    }
+  };
+
+  const runAll = async () => {
+    if (!apiKey) return showToast('請先設定 API Key');
+    if (photos.length === 0) return showToast('請先上傳圖片');
+    setRunning(true);
+    const instruction = buildInstruction();
+    for (const p of photos) {
+      if (p.status === 'done') continue;
+      updatePhoto(p.id, { status: 'processing', error: null });
+      try {
+        const parts = [
+          { inlineData: { mimeType: p.mime, data: p.base64 } },
+          { text: instruction }
+        ];
+        const text = await callGeminiText(apiKey, parts);
+        updatePhoto(p.id, { status: 'done', prompt: text });
+      } catch (err) {
+        updatePhoto(p.id, { status: 'error', error: err.message || '未知錯誤' });
+      }
+    }
+    setRunning(false);
+  };
+
+  const copyText = (text) => {
+    navigator.clipboard.writeText(text).then(
+      () => showToast('已複製到剪貼簿'),
+      () => showToast('複製失敗')
+    );
+  };
+
+  const exportAll = () => {
+    const done = photos.filter(p => p.status === 'done' && p.prompt);
+    if (done.length === 0) return showToast('還沒有完成的 prompt');
+    const text = done.map(p => `=== ${p.name} ===\n${p.prompt}\n`).join('\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'image_prompts.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  };
+
+  const clearAll = () => {
+    if (!confirm('清空所有圖片與 prompt？')) return;
+    setPhotos([]);
+  };
+
+  return (
+    <>
+      <div className="section">
+        <h2>1. 上傳要產生 prompt 的圖片</h2>
+        <DropZone onFiles={addFiles} />
+        {photos.length > 0 && (
+          <div className="bar">
+            <strong>共 {photos.length} 張</strong>
+            <span className="spacer" />
+            <button className="btn btn-danger btn-small" onClick={clearAll}>清空</button>
+          </div>
+        )}
+      </div>
+
+      <div className="section">
+        <h2>2. 輸出設定</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
+          <div>
+            <label>語言</label>
+            <select value={language} onChange={e => setLanguage(e.target.value)}>
+              <option value="en">英文（建議，AI 圖像模型多以英文訓練）</option>
+              <option value="zh">繁體中文</option>
+            </select>
+          </div>
+          <div>
+            <label>詳盡度</label>
+            <select value={detailLevel} onChange={e => setDetailLevel(e.target.value)}>
+              <option value="exhaustive">🔬 極致詳盡（建議，無字數限制，分小節描述每個細節）</option>
+              <option value="detailed">詳細（單段約 400–700 字）</option>
+              <option value="standard">標準（單段約 150–250 字）</option>
+            </select>
+          </div>
+        </div>
+        <label>額外要求（可留空）</label>
+        <textarea
+          rows={2}
+          placeholder="例如：偏電影感、加強情緒描述、不要寫人物年紀 …"
+          value={extraGuidance}
+          onChange={e => setExtraGuidance(e.target.value)}
+        />
+        <div className="field-hint">系統會自動排除真人姓名、卡通／品牌／地標等專有名詞，改用一般描述詞。極致詳盡模式會輸出長段結構化描述（[STYLE]、[SUBJECT]、[LIGHTING] …），目標是讓他人僅憑 prompt 重現幾乎一模一樣的圖。</div>
+      </div>
+
+      <div className="section">
+        <h2>3. 產生 Prompt</h2>
+        <div className="bar">
+          <button
+            className="btn btn-primary btn-large"
+            onClick={runAll}
+            disabled={running || !apiKey || photos.length === 0}
+          >
+            {running ? <><span className="spinner" /> 產生中…</> : '✍️ 為所有圖片產生 Prompt'}
+          </button>
+          <button className="btn btn-secondary" onClick={exportAll} disabled={running}>
+            ⬇ 匯出全部（.txt）
+          </button>
+        </div>
+
+        {photos.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            {photos.map(p => (
+              <div key={p.id} className="prompt-card">
+                <div className="prompt-card-header">
+                  <img className="prompt-card-thumb" src={p.dataURL} alt={p.name} />
+                  <div style={{ flex: 1 }}>
+                    <div className="prompt-card-name">{p.name}</div>
+                    <div style={{ fontSize: '0.78rem', color: '#9A7F76', marginTop: 4 }}>
+                      {p.status === 'pending' && '尚未產生'}
+                      {p.status === 'processing' && '產生中…'}
+                      {p.status === 'done' && '✓ 完成'}
+                      {p.status === 'error' && `失敗：${p.error}`}
+                    </div>
+                  </div>
+                  <button className="btn btn-danger btn-small" onClick={() => removePhoto(p.id)}>移除</button>
+                </div>
+                {p.prompt && (
+                  <>
+                    <div className="prompt-text">{p.prompt}</div>
+                    <div className="prompt-actions">
+                      <button className="btn btn-secondary btn-small" onClick={() => copyText(p.prompt)}>📋 複製</button>
+                      <button className="btn btn-secondary btn-small" onClick={() => runOne(p.id)} disabled={running}>🔄 重做</button>
+                    </div>
+                  </>
+                )}
+                {!p.prompt && (
+                  <div className="prompt-actions">
+                    <button className="btn btn-secondary btn-small" onClick={() => runOne(p.id)} disabled={running}>單張產生</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ===== App =====
+function App() {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2400);
+  };
+
+  return (
+    <div className="app-container">
+      <div style={{ marginBottom: 20 }}>
+        <h1>🧺 圖片洗脫烘</h1>
+        <div className="subtitle">把上傳的圖片洗成乾淨、無專有名詞的詳盡 prompt，目標是讓他人僅憑文字就能重現幾乎一模一樣的圖。</div>
+      </div>
+
+      <ApiKeySection apiKey={apiKey} setApiKey={setApiKey} />
+
+      <PromptGeneratorTab apiKey={apiKey} showToast={showToast} />
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
