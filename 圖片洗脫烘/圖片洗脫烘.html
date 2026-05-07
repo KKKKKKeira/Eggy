@@ -469,7 +469,7 @@ function PromptGeneratorTab({ apiKey, showToast }) {
 - 五官：頭型、眼睛形狀大小色號、眉毛、鼻、嘴、耳、皮膚 / 毛 / 鱗的紋理與顏色（hex 或具體色相）
 - 髮型 / 毛流：長度、層次、分線、顏色（含 highlight / lowlight）、質感
 - 表情與情緒、視線方向、嘴部動作
-- 姿勢、肢體角度、手指動作、重心
+- 姿勢與肢體請寫在 [POSE & ACTION]，這裡只寫「主體本身屬性」（外觀、五官、服裝等），不要重複寫姿勢
 - 服裝（每件分開寫）：剪裁、領型、材質感、紋理、顏色（具體）、皺褶、合身度、長度、配件位置與細節
 - 飾品 / 配件 / 道具：每一個物件的形狀、材質、顏色、磨損、位置
 - 任何標誌性／容易被畫錯的特徵（疤痕、刺青、痣、特殊耳朵形狀、配色分區）
@@ -477,8 +477,32 @@ function PromptGeneratorTab({ apiKey, showToast }) {
 [COMPOSITION & FRAMING]
 鏡頭視角（high angle / eye-level / low angle / overhead / Dutch tilt）、焦距感（廣角 / 標準 / 中長焦 / 望遠的視覺特徵）、景別（特寫 / 半身 / 全身 / 大遠景）、景深（淺景深散景強度 / 全景深）、構圖法（黃金比例 / 三分法 / 對稱 / 對角線 / 中央 / 框中框）、主體在畫面中的位置（左中右、上中下、與邊界距離）、長寬比、畫面留白方向、是否有 leading lines。
 
-[POSE & ACTION]
-完整描述當下這一幀的動作與動勢：靜止 / 走動 / 揮手 / 坐 / 蹲 …，重心、肌肉張力、衣擺飄動方向，與其他主體的相對距離與互動。
+[POSE & ACTION — 骨架級精準描述（重要：這節決定重現後的姿勢是否一致）]
+**禁止只寫「站著」「揮手」「坐著」這種高階動詞**。必須逐一寫出每個身體部位的幾何狀態，讓另一個 AI 看完能 1:1 重建這個姿勢。請依下列項目逐項寫出（看到的才寫，沒看到的略過該項，不要用模糊詞）：
+
+- BODY ORIENTATION 身體面向：相對相機是 full-front / 1/4 turn-left / 1/2 profile-left / 3/4 turn-right / back-to-camera 等，並寫出旋轉角度感（例：torso rotated ~20° to viewer's left）
+- WEIGHT & STANCE 重心：站姿 / 坐姿 / 蹲 / 半蹲 / 跪 / 躺 / 漂浮；體重落在哪隻腳（contrapposto / even / forward-leaning / hip-out 哪側）
+- SPINE 脊椎：直立 / 微駝 / 後仰 / 側彎，腰部彎曲方向與角度感
+- HEAD 頭部：相對軀幹的方向（與身體同向 / 轉向左 X° / 轉向右 X°），俯仰（chin-up / chin-down / level，估計角度）、傾側（tilt-left / tilt-right，估計角度）
+- GAZE 視線向量：看相機 / 看畫面左側 / 看畫面右側 / 看畫面外某方向 / 低頭看手中物 / 閉眼；眼球位於眼眶的相對位置
+- SHOULDERS 肩膀：水平 / 一邊抬高一邊壓低、前伸 / 後縮、聳肩
+- LEFT ARM 左臂：完整描述上臂方向 + 手肘彎曲角度（直 / 彎 90° / 彎 45° / 完全彎曲）+ 前臂方向 + 手腕彎曲方向
+- LEFT HAND 左手：手掌朝向（朝相機 / 朝下 / 朝身體）+ 五指各自狀態（拇指：彎曲／伸直／與哪指接觸；食指：…；中指：…；無名指：…；小指：…）+ 是否握物 / 接觸物 / 接觸身體 / 比手勢
+- RIGHT ARM 右臂：同 LEFT ARM
+- RIGHT HAND 右手：同 LEFT HAND
+- HIPS / PELVIS 髖部：是否歪向一邊（hip-out left / right）、是否前傾後傾
+- LEFT LEG 左腿：上腿方向 + 膝蓋彎曲角度（直 / 微彎 / 彎 90° / 蹲）+ 小腿方向
+- LEFT FOOT 左腳：腳尖朝向（forward / 外八 / 內八，估計角度）、腳掌全著地 / 腳尖點地 / 抬起、是否承重
+- RIGHT LEG / RIGHT FOOT：同上
+- CONTACT POINTS 接觸點：身體與外物 / 自身的接觸（左手握杯柄、右手撐桌沿、屁股坐在椅子前緣、左腳踩在台階、肩膀靠牆等），具體寫出**接觸物 + 接觸身體部位 + 接觸方式**
+- INTERACTION 互動：與畫面中其他角色 / 物件的相對位置與動作關係（面對面、背對、共持一物、保持 X 距離等）
+- MOTION CUES 動勢線索：是否在動作中（衣擺、頭髮、毛、布料是否被動態風 / 慣性吹動，方向）；身體是否處於 mid-action 還是靜止瞬間
+- MUSCLE / TENSION 緊張度：放鬆 / 緊繃 / 微微施力，可見的肌肉張力位置
+- POSITION IN FRAME 在畫面中的位置：以分數座標寫主體中心點（例：center-of-mass at roughly x=0.5, y=0.55；feet at y=0.92），有助於還原構圖
+- SCALE 主體佔畫面比例：頭頂在 y= 多少、腳底在 y= 多少、橫向跨度
+
+**寫法範例（請模仿密度）**：
+"Body in 3/4 turn to viewer's right, weight on left leg with contrapposto hip-out left. Spine slight S-curve. Head turned ~10° to viewer's left from torso, chin level, slight tilt-right ~5°. Gaze directly at camera. Shoulders level, slightly back. Left arm hanging relaxed, elbow ~5° bend, hand at hip level with palm inward toward thigh, fingers loosely curled, thumb resting on side seam. Right arm raised: upper arm forward 45° from body, elbow bent ~110°, forearm coming toward chest, hand holding small rectangular smartphone in pinch grip — thumb on right edge front, index on top edge, middle/ring/pinky curled behind device. Hips squared toward viewer's right. Left leg straight, knee soft. Left foot flat on ground, toe pointing ~15° outward. Right leg slightly forward and bent ~10° at knee, right foot flat, toe pointing forward. No contact with environment besides ground. No motion blur — held still. Center of mass roughly at frame x=0.52, y=0.55; head top at y≈0.18, feet at y≈0.95."
 
 [LIGHTING — 光線詳盡]
 - 光源類型（自然 / 人造 / 混合）、時間（黎明 / 早晨 / 中午 / 黃昏 / 夜間）、天氣（晴 / 陰 / 多雲 / 雨後）
@@ -543,6 +567,7 @@ ${langHint}。
 - 不要前言、不要結論、不要 markdown 包裝、不要編號、不要引號、不要在開頭寫 "Prompt:" 之類的標籤
 - 直接輸出 prompt 本身${isExhaustive ? '（含小節標題用方括號 [SECTION]，每節下方是描述文字）' : '（單一段落）'}
 - 寧可長不可短：最高指導原則是「視覺重現度」
+- **姿勢部分必須骨架級**：每個關節角度、每隻手指狀態、視線向量、接觸點都要寫；不可只寫「站著」「坐著」「拿手機」這種高階詞 —— 會導致重新生成時姿勢隨機
 
 ${extraGuidance.trim() ? '【使用者額外要求】\n' + extraGuidance.trim() : ''}`;
   };
